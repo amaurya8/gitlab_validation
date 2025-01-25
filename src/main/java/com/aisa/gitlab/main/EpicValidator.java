@@ -29,7 +29,8 @@ public class EpicValidator {
         int perPage = 50;
         boolean hasMorePages = true;
 
-        Map<Integer, JsonObject> allEpics = new HashMap<>();  // Map to store all epics
+        // Map to store all epics across pages
+        Map<Integer, JsonObject> allEpics = new HashMap<>();
 
         while (hasMorePages) {
             LOGGER.log(Level.INFO, "Fetching epics - Page: {0}", currentPage);
@@ -53,17 +54,22 @@ public class EpicValidator {
                 break;
             }
 
+            // Accumulate epics from all pages into the map
+            for (JsonElement epicElement : epics) {
+                JsonObject epic = epicElement.getAsJsonObject();
+                int epicId = epic.get("id").getAsInt();
+                allEpics.put(epicId, epic);  // Add to the map instead of overwriting
+            }
+
+            // Process each epic after accumulating all epics
             for (JsonElement epicElement : epics) {
                 JsonObject epic = epicElement.getAsJsonObject();
                 int epicId = epic.get("id").getAsInt();
                 String epicLink = epic.get("web_url").getAsString();
                 String createdAt = epic.get("created_at").getAsString();
 
-                // Store the epic in allEpics map
-                allEpics.put(epicId, epic);
-
                 if (isCreatedWithinLastYear(createdAt)) {
-                    validateEpic(epic, epicId, epicLink, createdAt, allEpics);
+                    validateEpic(epic, epicId, epicLink, createdAt, allEpics);  // Validate with the full map
                 }
             }
 
