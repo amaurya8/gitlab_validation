@@ -29,6 +29,8 @@ public class EpicValidator {
         int perPage = 50;
         boolean hasMorePages = true;
 
+        Map<Integer, JsonObject> allEpics = new HashMap<>();  // Map to store all epics
+
         while (hasMorePages) {
             LOGGER.log(Level.INFO, "Fetching epics - Page: {0}", currentPage);
             RequestSpecification epicRequest = RestAssured.given()
@@ -57,8 +59,11 @@ public class EpicValidator {
                 String epicLink = epic.get("web_url").getAsString();
                 String createdAt = epic.get("created_at").getAsString();
 
+                // Store the epic in allEpics map
+                allEpics.put(epicId, epic);
+
                 if (isCreatedWithinLastYear(createdAt)) {
-                    validateEpic(epic, epicId, epicLink, createdAt);
+                    validateEpic(epic, epicId, epicLink, createdAt, allEpics);
                 }
             }
 
@@ -68,7 +73,7 @@ public class EpicValidator {
         }
     }
 
-    private void validateEpic(JsonObject epic, int epicId, String epicLink, String createdAt) {
+    private void validateEpic(JsonObject epic, int epicId, String epicLink, String createdAt, Map<Integer, JsonObject> allEpics) {
         boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
         boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
 
@@ -78,11 +83,30 @@ public class EpicValidator {
 
         // Check if the epic has the label "Crew Delivery Epic"
         boolean isCrewDeliveryEpic = epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Crew Delivery Epic");
-        if (isCrewDeliveryEpic) {
+        if (isCrewDeliveryEpic || isPartOfCrewDeliveryEpic(epic, allEpics)) {
             logCrewDeliveryEpic(epicId, epicLink, createdAt);
         } else {
-            logEpicFailure(epicId, epicLink, "Not labeled as Crew Delivery Epic");
+            logEpicFailure(epicId, epicLink, "Neither labeled as Crew Delivery Epic nor part of a Crew Delivery Epic hierarchy");
         }
+    }
+
+    private boolean isPartOfCrewDeliveryEpic(JsonObject epic, Map<Integer, JsonObject> allEpics) {
+        while (epic != null) {
+            // Check if the current epic has the "Crew Delivery Epic" label
+            if (epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Crew Delivery Epic")) {
+                return true;
+            }
+
+            // Move to the parent epic if available
+            if (epic.has("parent_id") && !epic.get("parent_id").isJsonNull()) {
+                int parentId = epic.get("parent_id").getAsInt();
+                epic = allEpics.get(parentId); // Fetch the parent epic from the map
+            } else {
+                epic = null; // No parent, end the loop
+            }
+        }
+
+        return false; // No "Crew Delivery Epic" label found in the hierarchy
     }
 
     private boolean containsLabel(JsonArray labels, String targetLabel) {
