@@ -32,6 +32,7 @@ public class EpicValidator {
         // Map to store all epics across pages
         Map<Integer, JsonObject> allEpics = new HashMap<>();
 
+        // Step 1: Fetch all epics and accumulate them in allEpics
         while (hasMorePages) {
             LOGGER.log(Level.INFO, "Fetching epics - Page: {0}", currentPage);
             RequestSpecification epicRequest = RestAssured.given()
@@ -54,28 +55,29 @@ public class EpicValidator {
                 break;
             }
 
-            // Accumulate epics from all pages into the map
+            // Accumulate epics from the current page into the map
             for (JsonElement epicElement : epics) {
                 JsonObject epic = epicElement.getAsJsonObject();
                 int epicId = epic.get("id").getAsInt();
-                allEpics.put(epicId, epic);  // Add to the map instead of overwriting
+                allEpics.put(epicId, epic);  // Store epic from the current page
             }
 
-            // Process each epic after accumulating all epics
-            for (JsonElement epicElement : epics) {
-                JsonObject epic = epicElement.getAsJsonObject();
-                int epicId = epic.get("id").getAsInt();
-                String epicLink = epic.get("web_url").getAsString();
-                String createdAt = epic.get("created_at").getAsString();
-
-                if (isCreatedWithinLastYear(createdAt)) {
-                    validateEpic(epic, epicId, epicLink, createdAt, allEpics);  // Validate with the full map
-                }
-            }
-
+            // Check if there's another page of results
             String nextPageLink = epicResponse.getHeader("X-Next-Page");
             hasMorePages = (nextPageLink != null && !nextPageLink.isEmpty());
             currentPage++;
+        }
+
+        // Step 2: Perform validation after accumulating all epics
+        for (Map.Entry<Integer, JsonObject> entry : allEpics.entrySet()) {
+            JsonObject epic = entry.getValue();
+            int epicId = epic.get("id").getAsInt();
+            String epicLink = epic.get("web_url").getAsString();
+            String createdAt = epic.get("created_at").getAsString();
+
+            if (isCreatedWithinLastYear(createdAt)) {
+                validateEpic(epic, epicId, epicLink, createdAt, allEpics);  // Validate using the full map
+            }
         }
     }
 
