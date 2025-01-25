@@ -22,12 +22,17 @@ public class IssueValidator {
     public static final List<Map<String, String>> issueFailures = new ArrayList<>();
 
     public void validateIssuesInProjectsUnderGroup(int groupId, Gson gson) {
+        fetchAndValidateProjectsInGroup(groupId, gson);
+        fetchAndValidateSubgroups(groupId, gson);
+    }
+
+    private void fetchAndValidateProjectsInGroup(int groupId, Gson gson) {
         int currentPage = 1;
         int perPage = 50;
         boolean hasMorePages = true;
 
         while (hasMorePages) {
-            LOGGER.log(Level.INFO, "Fetching projects - Page: {0}", currentPage);
+            LOGGER.log(Level.INFO, "Fetching projects for group {0} - Page: {1}", new Object[]{groupId, currentPage});
             RequestSpecification projectRequest = RestAssured.given()
                     .header("PRIVATE-TOKEN", PRIVATE_TOKEN)
                     .queryParam("page", currentPage)
@@ -36,12 +41,12 @@ public class IssueValidator {
             Response projectResponse = projectRequest.get("/groups/" + groupId + "/projects");
 
             if (projectResponse.getStatusCode() != 200) {
-                LOGGER.log(Level.SEVERE, "Failed to fetch projects. HTTP Error Code: {0}", projectResponse.getStatusCode());
+                LOGGER.log(Level.SEVERE, "Failed to fetch projects for group {0}. HTTP Error Code: {1}", new Object[]{groupId, projectResponse.getStatusCode()});
                 return;
             }
 
             JsonArray projects = gson.fromJson(projectResponse.getBody().asString(), JsonArray.class);
-            LOGGER.log(Level.INFO, "Number of projects fetched: {0}", projects.size());
+            LOGGER.log(Level.INFO, "Number of projects fetched for group {0}: {1}", new Object[]{groupId, projects.size()});
 
             if (projects.size() == 0) {
                 hasMorePages = false;
@@ -58,6 +63,43 @@ public class IssueValidator {
             }
 
             String nextPageLink = projectResponse.getHeader("X-Next-Page");
+            hasMorePages = (nextPageLink != null && !nextPageLink.isEmpty());
+            currentPage++;
+        }
+    }
+
+    private void fetchAndValidateSubgroups(int groupId, Gson gson) {
+        int currentPage = 1;
+        int perPage = 50;
+        boolean hasMorePages = true;
+
+        while (hasMorePages) {
+            LOGGER.log(Level.INFO, "Fetching subgroups for group {0} - Page: {1}", new Object[]{groupId, currentPage});
+            RequestSpecification subgroupRequest = RestAssured.given()
+                    .header("PRIVATE-TOKEN", PRIVATE_TOKEN)
+                    .queryParam("page", currentPage)
+                    .queryParam("per_page", perPage);
+
+            Response subgroupResponse = subgroupRequest.get("/groups/" + groupId + "/subgroups");
+
+            if (subgroupResponse.getStatusCode() != 200) {
+                LOGGER.log(Level.SEVERE, "Failed to fetch subgroups for group {0}. HTTP Error Code: {1}", new Object[]{groupId, subgroupResponse.getStatusCode()});
+                return;
+            }
+
+            JsonArray subgroups = gson.fromJson(subgroupResponse.getBody().asString(), JsonArray.class);
+            LOGGER.log(Level.INFO, "Number of subgroups fetched for group {0}: {1}", new Object[]{groupId, subgroups.size()});
+
+            for (JsonElement subgroupElement : subgroups) {
+                JsonObject subgroup = subgroupElement.getAsJsonObject();
+                int subgroupId = subgroup.get("id").getAsInt();
+                String subgroupName = subgroup.get("name").getAsString();
+
+                LOGGER.log(Level.INFO, "Recursively validating projects and subgroups under subgroup: {0} (ID: {1})", new Object[]{subgroupName, subgroupId});
+                validateIssuesInProjectsUnderGroup(subgroupId, gson);
+            }
+
+            String nextPageLink = subgroupResponse.getHeader("X-Next-Page");
             hasMorePages = (nextPageLink != null && !nextPageLink.isEmpty());
             currentPage++;
         }
