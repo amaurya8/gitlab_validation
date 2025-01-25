@@ -142,9 +142,21 @@ public class IssueValidator {
 
     private void validateIssue(JsonObject issue, int issueId, String issueLink) {
         boolean hasWeight = issue.has("weight") && !issue.get("weight").isJsonNull();
+        boolean isOpen = issue.has("state") && "opened".equalsIgnoreCase(issue.get("state").getAsString());
+        boolean isClosed = issue.has("state") && "closed".equalsIgnoreCase(issue.get("state").getAsString());
+        boolean closedAfterThreshold = false;
 
-        if (!hasWeight) {
-            logIssueFailure(issueId, issueLink, "Missing weight");
+        if (isClosed && issue.has("closed_at") && !issue.get("closed_at").isJsonNull()) {
+            String closedAt = issue.get("closed_at").getAsString();
+            // Check if the closed date is on or after January 1, 2025
+            closedAfterThreshold = closedAt.compareTo("2025-01-01T00:00:00Z") >= 0;
+        }
+
+        // Log failures based on conditions
+        if (isOpen && !hasWeight) {
+            logIssueFailure(issueId, issueLink, "Open issue missing weight");
+        } else if (closedAfterThreshold && !hasWeight) {
+            logIssueFailure(issueId, issueLink, "Closed issue (on/after 2025-01-01) missing weight");
         }
     }
 
