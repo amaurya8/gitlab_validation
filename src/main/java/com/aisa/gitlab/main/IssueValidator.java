@@ -145,6 +145,11 @@ public class IssueValidator {
         boolean isOpen = issue.has("state") && "opened".equalsIgnoreCase(issue.get("state").getAsString());
         boolean isClosed = issue.has("state") && "closed".equalsIgnoreCase(issue.get("state").getAsString());
         boolean closedAfterThreshold = false;
+        boolean isLinkedToEpic = issue.has("epic") && !issue.get("epic").isJsonNull();
+        boolean isLinkedToCrewDeliveryEpic = false;
+
+        // Predefined list of crew delivery epic IDs
+        List<Integer> crewDeliveryEpicIds = List.of(2345, 5678, 7890);
 
         if (isClosed && issue.has("closed_at") && !issue.get("closed_at").isJsonNull()) {
             String closedAt = issue.get("closed_at").getAsString();
@@ -152,11 +157,26 @@ public class IssueValidator {
             closedAfterThreshold = closedAt.compareTo("2025-01-01T00:00:00Z") >= 0;
         }
 
+        // Check if the issue is linked to an epic and if the epic ID is in the crew delivery list
+        if (isLinkedToEpic) {
+            JsonObject epic = issue.getAsJsonObject("epic");
+            if (epic.has("id") && !epic.get("id").isJsonNull()) {
+                int epicId = epic.get("id").getAsInt();
+                isLinkedToCrewDeliveryEpic = crewDeliveryEpicIds.contains(epicId);
+            }
+        }
+
         // Log failures based on conditions
         if (isOpen && !hasWeight) {
             logIssueFailure(issueId, issueLink, "Open issue missing weight");
         } else if (closedAfterThreshold && !hasWeight) {
             logIssueFailure(issueId, issueLink, "Closed issue (on/after 2025-01-01) missing weight");
+        }
+
+        if (!isLinkedToEpic) {
+            logIssueFailure(issueId, issueLink, "Issue not linked to an epic");
+        } else if (!isLinkedToCrewDeliveryEpic) {
+            logIssueFailure(issueId, issueLink, "Issue not linked to a crew delivery epic (epic ID not in the allowed list)");
         }
     }
 
