@@ -60,7 +60,7 @@ public class EpicValidator {
             for (JsonElement epicElement : epics) {
                 JsonObject epic = epicElement.getAsJsonObject();
                 int epicId = epic.get("id").getAsInt();
-                allEpics.put(epicId, epic);  // Store epic from the current page
+                allEpics.put(epicId, epic); // Store epic from the current page
             }
 
             // Check if there's another page of results
@@ -74,38 +74,44 @@ public class EpicValidator {
             JsonObject epic = entry.getValue();
             int epicId = epic.get("id").getAsInt();
             String epicLink = epic.get("web_url").getAsString();
-            String createdAt = epic.get("created_at").getAsString();
-            String updatedAt = epic.get("updated_at").getAsString();
+            String state = epic.get("state").getAsString(); // Open or Closed
+            String closedAt = epic.has("closed_at") && !epic.get("closed_at").isJsonNull()
+                    ? epic.get("closed_at").getAsString() : null;
 
-            // Validate only if the epic is open or closed after 2025-01-01
-            if (isCreatedOrUpdatedAfterThreshold(updatedAt)) {
-                if (isCreatedWithinLastYear(createdAt)) {
-                    validateEpic(epic, epicId, epicLink, createdAt, allEpics);  // Validate using the full map
-                }
+            // Perform Crew Delivery Epic check based on state
+            if ("opened".equalsIgnoreCase(state)) {
+                validateCrewDeliveryEpic(epic, epicId, epicLink, allEpics);
+            } else if ("closed".equalsIgnoreCase(state) && isClosedOnOrAfterThreshold(closedAt)) {
+                validateCrewDeliveryEpic(epic, epicId, epicLink, allEpics);
             }
         }
     }
 
-    private boolean isCreatedOrUpdatedAfterThreshold(String updatedAt) {
-        LocalDate updatedDate = LocalDate.parse(updatedAt, DateTimeFormatter.ISO_DATE_TIME);
-        return updatedDate.isAfter(DATE_THRESHOLD.minusDays(1)); // After 2025-01-01
+    private boolean isClosedOnOrAfterThreshold(String closedAt) {
+        if (closedAt == null) {
+            return false;
+        }
+        LocalDate closedDate = LocalDate.parse(closedAt, DateTimeFormatter.ISO_DATE_TIME);
+        return closedDate.isAfter(DATE_THRESHOLD.minusDays(1)); // After or on 2025-01-01
     }
 
-    private void validateEpic(JsonObject epic, int epicId, String epicLink, String createdAt, Map<Integer, JsonObject> allEpics) {
-        boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
-        boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
-
-        if (!hasStartDate || !hasDueDate) {
-            logEpicFailure(epicId, epicLink, "Missing start and/or due date");
-        }
-
+    private void validateCrewDeliveryEpic(JsonObject epic, int epicId, String epicLink, Map<Integer, JsonObject> allEpics) {
         // Check if the epic has the label "Crew Delivery Epic"
         boolean isCrewDeliveryEpic = epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Crew Delivery Epic");
         if (isCrewDeliveryEpic || isPartOfCrewDeliveryEpic(epic, allEpics)) {
-            logCrewDeliveryEpic(epicId, epicLink, createdAt);
+            logCrewDeliveryEpic(epicId, epicLink);
         } else {
             logEpicFailure(epicId, epicLink, "Neither labeled as Crew Delivery Epic nor part of a Crew Delivery Epic hierarchy");
         }
+    }
+
+    private boolean containsLabel(JsonArray labels, String targetLabel) {
+        for (JsonElement label : labels) {
+            if (label.getAsString().equalsIgnoreCase(targetLabel)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isPartOfCrewDeliveryEpic(JsonObject epic, Map<Integer, JsonObject> allEpics) {
@@ -127,28 +133,12 @@ public class EpicValidator {
         return false; // No "Crew Delivery Epic" label found in the hierarchy
     }
 
-    private boolean containsLabel(JsonArray labels, String targetLabel) {
-        for (JsonElement label : labels) {
-            if (label.getAsString().equalsIgnoreCase(targetLabel)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void logCrewDeliveryEpic(int epicId, String epicLink, String createdAt) {
+    private void logCrewDeliveryEpic(int epicId, String epicLink) {
         Map<String, String> crewEpic = new HashMap<>();
         crewEpic.put("epic_id", String.valueOf(epicId));
         crewEpic.put("epic_link", epicLink);
-        crewEpic.put("created_at", createdAt);
         crewDeliveryEpics.add(crewEpic);
         LOGGER.log(Level.INFO, "Crew Delivery Epic found: {0}", epicLink);
-    }
-
-    private static boolean isCreatedWithinLastYear(String createdAt) {
-        LocalDate createdDate = LocalDate.parse(createdAt, DateTimeFormatter.ISO_DATE_TIME);
-        LocalDate oneYearAgo = LocalDate.now().minusYears(1);
-        return createdDate.isAfter(oneYearAgo);
     }
 
     private void logEpicFailure(int epicId, String epicLink, String message) {
