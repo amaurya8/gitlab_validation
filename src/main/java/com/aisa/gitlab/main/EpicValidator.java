@@ -23,6 +23,7 @@ public class EpicValidator {
     private static final String PRIVATE_TOKEN = "your_personal_access_token";
     public static final List<Map<String, String>> epicFailures = new ArrayList<>();
     public static final List<Map<String, String>> crewDeliveryEpics = new ArrayList<>();
+    private static final LocalDate DATE_THRESHOLD = LocalDate.parse("2025-01-01");
 
     public void validateEpicsUnderGroup(int groupId, Gson gson) {
         int currentPage = 1;
@@ -74,11 +75,20 @@ public class EpicValidator {
             int epicId = epic.get("id").getAsInt();
             String epicLink = epic.get("web_url").getAsString();
             String createdAt = epic.get("created_at").getAsString();
+            String updatedAt = epic.get("updated_at").getAsString();
 
-            if (isCreatedWithinLastYear(createdAt)) {
-                validateEpic(epic, epicId, epicLink, createdAt, allEpics);  // Validate using the full map
+            // Validate only if the epic is open or closed after 2025-01-01
+            if (isCreatedOrUpdatedAfterThreshold(updatedAt)) {
+                if (isCreatedWithinLastYear(createdAt)) {
+                    validateEpic(epic, epicId, epicLink, createdAt, allEpics);  // Validate using the full map
+                }
             }
         }
+    }
+
+    private boolean isCreatedOrUpdatedAfterThreshold(String updatedAt) {
+        LocalDate updatedDate = LocalDate.parse(updatedAt, DateTimeFormatter.ISO_DATE_TIME);
+        return updatedDate.isAfter(DATE_THRESHOLD.minusDays(1)); // After 2025-01-01
     }
 
     private void validateEpic(JsonObject epic, int epicId, String epicLink, String createdAt, Map<Integer, JsonObject> allEpics) {
