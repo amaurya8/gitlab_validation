@@ -2,9 +2,13 @@ package com.aisa.gitlab.main;
 
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
 
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class GitLabGroupValidator {
@@ -31,5 +35,20 @@ public class GitLabGroupValidator {
         LOGGER.info("Validating issues in projects under the group...");
         IssueValidator issueValidator = new IssueValidator();
         issueValidator.validateIssuesInProjectsUnderGroup(groupId, gson);
+    }
+
+    private String getGroupName(int groupId) {
+        RequestSpecification groupRequest = RestAssured.given()
+                .header("PRIVATE-TOKEN", PRIVATE_TOKEN);
+
+        Response groupResponse = groupRequest.get("/groups/" + groupId);
+
+        if (groupResponse.getStatusCode() != 200) {
+            LOGGER.log(Level.SEVERE, "Failed to fetch group details. HTTP Error Code: {0}", groupResponse.getStatusCode());
+            return "Unknown Group"; // Fallback value in case of failure
+        }
+
+        JsonObject groupDetails = new Gson().fromJson(groupResponse.getBody().asString(), JsonObject.class);
+        return groupDetails.has("name") ? groupDetails.get("name").getAsString() : "Unknown Group";
     }
 }
