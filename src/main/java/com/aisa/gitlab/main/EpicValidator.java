@@ -77,6 +77,13 @@ public class EpicValidator {
             String state = epic.get("state").getAsString(); // Open or Closed
             String closedAt = epic.has("closed_at") && !epic.get("closed_at").isJsonNull()
                     ? epic.get("closed_at").getAsString() : null;
+        // Perform start and due date check
+            boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
+            boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
+
+            if ("opened".equalsIgnoreCase(state) & !hasStartDate || !hasDueDate) {
+                logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date");
+            }
 
             // Perform Crew Delivery Epic check based on state
             if ("opened".equalsIgnoreCase(state)) {
