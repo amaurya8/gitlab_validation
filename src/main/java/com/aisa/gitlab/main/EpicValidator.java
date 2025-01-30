@@ -156,13 +156,30 @@ public class EpicValidator {
     }
 
     private void logEpicFailure(int epicId, String epicLink, String message, String epicCreatedBy) {
+        String pod = extractPod(epicLink); // Extract POD from the link
+
         Map<String, String> failure = new HashMap<>();
         failure.put("epic_id", String.valueOf(epicId));
         failure.put("epic_link", epicLink);
         failure.put("failure_message", message);
-        failure.put("epic_created_by", epicCreatedBy); // Add the creator's information
+        failure.put("epic_created_by", epicCreatedBy);
+        failure.put("pod", pod); // Add POD information
+
         epicFailures.add(failure);
-        LOGGER.log(Level.WARNING, "Epic validation failure: {0} - {1} - Created By: {2}",
-                new Object[]{epicLink, message, epicCreatedBy});
+
+        LOGGER.log(Level.WARNING, "Epic validation failure: {0} - {1} - Created By: {2} - POD: {3}",
+                new Object[]{epicLink, message, epicCreatedBy, pod});
+    }
+
+    private String extractPod(String epicLink) {
+        String prefix = "https://www.aisa-automations.com/xyx/mr123rg5/"; // Common prefix
+        if (epicLink.startsWith(prefix)) {
+            String remainingPath = epicLink.substring(prefix.length()); // Remove prefix
+            String[] parts = remainingPath.split("/"); // Split by '/'
+            if (parts.length > 1) {
+                return parts[1]; // Second segment after the common prefix
+            }
+        }
+        return "Unknown"; // Default if no match
     }
 }
