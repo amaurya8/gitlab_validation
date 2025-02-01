@@ -1,0 +1,57 @@
+#!/bin/bash
+
+LOCKFILE="/tmp/my_script.lock"
+LOGFILE="/path/to/logfile.log"
+
+# Function to log messages with timestamps
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOGFILE"
+}
+
+# Prevent multiple instances
+if [ -f "$LOCKFILE" ]; then
+    log_message "Script is already running."
+    exit 1
+fi
+
+touch "$LOCKFILE"
+trap "rm -f $LOCKFILE; log_message 'Script terminated. Lockfile removed.'" EXIT  # Ensure lock removal
+
+while true; do
+    current_time=$(date +"%H:%M")
+    current_day=$(date +"%u")  # Get the day of the week (1=Monday, 7=Sunday)
+
+    # Skip execution on weekends (Saturday=6, Sunday=7)
+    if [[ "$current_day" -ge 6 ]]; then
+        log_message "Skipping execution on weekends. Sleeping for 24 hours."
+        sleep 86400  # Sleep for 24 hours and check again the next day
+        continue
+    fi
+
+    if [ "$current_time" == "08:00" ]; then
+        log_message "Running Java program at $current_time on a weekday."
+
+        # Execute Java program and capture the exit status
+        /usr/bin/java -jar /path/to/your-program.jar >> "$LOGFILE" 2>&1
+        java_exit_status=$?
+
+        if [ $java_exit_status -eq 0 ]; then
+            log_message "Java program executed successfully."
+        else
+            log_message "Java program failed with exit code $java_exit_status."
+        fi
+
+        sleep 86400  # Sleep for 24 hours
+    else
+        sleep 60  # Check every minute
+    fi
+done
+
+#Running in backgroud, checking status and killing on need basis
+#nohup ./script.sh &
+#
+#ps aux | grep script.sh | grep -v grep
+#
+#tail -f /path/to/logfile.log
+#
+#pkill -f script.sh
