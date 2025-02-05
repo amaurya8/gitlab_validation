@@ -80,18 +80,18 @@ public class EpicValidator {
             String epicCreatedBy = epic.has("author") && epic.get("author").getAsJsonObject().has("name")
                     ? epic.get("author").getAsJsonObject().get("name").getAsString()
                     : "Unknown"; // Fetch the creator's name, default to "Unknown" if not present
+            String epicClosedBy = "Unknown"; // Default value
+            if (state.equalsIgnoreCase("closed") && epic.has("closed_by") && epic.get("closed_by").getAsJsonObject().has("name")) {
+                epicClosedBy = epic.get("closed_by").getAsJsonObject().get("name").getAsString();
+            }
 
             // Perform start and due date check
             boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
             boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
 
-//            if ("opened".equalsIgnoreCase(state) & !hasStartDate || !hasDueDate) {
-//                logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date",epicCreatedBy);
-//            }
-
             if (state.equalsIgnoreCase("opened")) {
                 if (!hasStartDate || !hasDueDate) {
-                    logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date", epicCreatedBy);
+                    logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date", epicCreatedBy,epicClosedBy);
                 }
             }
 
@@ -118,10 +118,15 @@ public class EpicValidator {
         if (isCrewDeliveryEpic) {
             logCrewDeliveryEpic(epicId, epicLink);
         } else {
+            String state = epic.get("state").getAsString(); // Open or Closed
             String epicCreatedBy = epic.has("author") && epic.get("author").getAsJsonObject().has("name")
                     ? epic.get("author").getAsJsonObject().get("name").getAsString()
                     : "Unknown"; // Fetch the creator's name, fallback to "Unknown" if not present
-            logEpicFailure(epicId, epicLink, "Neither labeled as Crew Delivery Epic nor part of a Crew Delivery Epic hierarchy",epicCreatedBy);
+            String epicClosedBy = "Unknown"; // Default value
+            if (state.equalsIgnoreCase("closed") && epic.has("closed_by") && epic.get("closed_by").getAsJsonObject().has("name")) {
+                epicClosedBy = epic.get("closed_by").getAsJsonObject().get("name").getAsString();
+            }
+            logEpicFailure(epicId, epicLink, "Neither labeled as Crew Delivery Epic nor part of a Crew Delivery Epic hierarchy",epicCreatedBy,epicClosedBy);
         }
     }
 
@@ -161,7 +166,7 @@ public class EpicValidator {
         LOGGER.log(Level.INFO, "Crew Delivery Epic found: {0}", epicLink);
     }
 
-    private void logEpicFailure(int epicId, String epicLink, String message, String epicCreatedBy) {
+    private void logEpicFailure(int epicId, String epicLink, String message, String epicCreatedBy,String epicClosedBy) {
         String pod = extractPod(epicLink); // Extract POD from the link
 
         Map<String, String> failure = new HashMap<>();
