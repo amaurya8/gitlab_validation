@@ -85,8 +85,14 @@ public class EpicValidator {
             boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
             boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
 
-            if ("opened".equalsIgnoreCase(state) & !hasStartDate || !hasDueDate) {
-                logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date",epicCreatedBy);
+//            if ("opened".equalsIgnoreCase(state) & !hasStartDate || !hasDueDate) {
+//                logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date",epicCreatedBy);
+//            }
+
+            if (state.equalsIgnoreCase("opened")) {
+                if (!hasStartDate || !hasDueDate) {
+                    logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date", epicCreatedBy);
+                }
             }
 
             // Perform Crew Delivery Epic check based on state
