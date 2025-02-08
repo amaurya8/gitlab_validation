@@ -157,6 +157,7 @@ public class IssueValidator {
         String closedBy = (isClosed && issue.has("closed_by") && issue.getAsJsonObject("closed_by").has("name"))
                 ? issue.getAsJsonObject("closed_by").get("name").getAsString()
                 : "N/A"; // If issue is not closed or closed_by is missing
+        String issueTitle = issue.get("title").getAsString();
         // Predefined list of crew delivery epic IDs
         List<Integer> crewDeliveryEpicIds = List.of(2345, 5678, 7890);
 
@@ -177,25 +178,26 @@ public class IssueValidator {
 
         // Log failures based on conditions
         if (isOpen && !hasWeight) {
-            logIssueFailure(issueId, issueLink, "Open issue missing weight",createdBy,closedBy);
+            logIssueFailure(issueId, issueLink, "Open issue missing weight",createdBy,closedBy,issueTitle);
         } else if (closedAfterThreshold && !hasWeight) {
-            logIssueFailure(issueId, issueLink, "Closed issue (on/after 2025-01-01) missing weight",createdBy,closedBy);
+            logIssueFailure(issueId, issueLink, "Closed issue (on/after 2025-01-01) missing weight",createdBy,closedBy,issueTitle);
         }
 
         if (!isLinkedToEpic) {
-            logIssueFailure(issueId, issueLink, "Issue not linked to an epic",createdBy,closedBy);
+            logIssueFailure(issueId, issueLink, "Issue not linked to an epic",createdBy,closedBy,issueTitle);
         } else if (!isLinkedToCrewDeliveryEpic) {
-            logIssueFailure(issueId, issueLink, "Issue not linked to a crew delivery epic (epic ID not in the allowed list)",createdBy,closedBy);
+            logIssueFailure(issueId, issueLink, "Issue not linked to a crew delivery epic (epic ID not in the allowed list)",createdBy,closedBy,issueTitle);
         }
     }
 
-    private void logIssueFailure(int issueId, String issueLink, String message, String createdBy, String closedBy) {
+    private void logIssueFailure(int issueId, String issueLink, String message, String createdBy, String closedBy,String issueTitle) {
         Map<String, String> failure = new HashMap<>();
         failure.put("issue_id", String.valueOf(issueId));
         failure.put("issue_link", issueLink);
         failure.put("failure_message", message);
         failure.put("created_by", createdBy);
         failure.put("closed_by", closedBy);
+        failure.put("issue_title",issueTitle);
 
         issueFailures.add(failure);
         LOGGER.log(Level.WARNING, "Issue validation failure: {0} - {1} | Created by: {2} | Closed by: {3}",
