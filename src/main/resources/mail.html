@@ -4,7 +4,7 @@
     <style>
         body {
             font-family: 'Aptos', Arial, sans-serif;
-            font-size: 11px;
+            font-size: 15px; /* 11pt in pixels */
             color: #333;
             line-height: 1.6;
         }
@@ -14,24 +14,30 @@
         .signature {
             margin-top: 20px;
             padding-top: 10px;
-            border-top: 2px solid #0073e6; /* Subtle line to separate */
-            font-size: 12px;
-            font-style: italic;
+            border-top: 2px solid #0073e6; /* Subtle separator */
+            font-size: 15px; /* Ensuring 11pt in pixels */
             color: #555;
         }
         .signature img {
             display: block;
             margin-top: 5px;
-            max-width: 120px; /* Adjust size as needed */
+            max-width: 120px;
         }
         .name {
             font-weight: bold;
-            font-size: 13px;
+            font-size: 16px;
             color: #0073e6;
         }
         .role {
-            font-size: 12px;
+            font-size: 15px; /* Ensures correct size */
             color: #444;
+            font-weight: normal; /* Removes bold */
+            font-style: normal; /* Removes italic */
+        }
+        /* Outlook Fix */
+        span, p, li {
+            font-size: 15px !important; /* Ensures Outlook respects 11pt */
+            mso-ansi-font-size: 11pt; /* Special Outlook font size fix */
         }
     </style>
 </head>
@@ -54,7 +60,7 @@
     <p><strong>Thank you for your cooperation.</strong></p>
 
     <div class="signature">
-<!--        <span class="name">Automated System</span> <br>-->
+        <span class="name">Automated System</span> <br>
         <span class="role">GitLab Hygiene Scanner</span> <br>
         <img src="data:image/png;base64,YOUR_BASE64_ENCODED_IMAGE" alt="Signature">
     </div>
