@@ -156,8 +156,18 @@ public class IssueValidator {
         // Extract "Closed by" information
         String closedBy = (isClosed && issue.has("closed_by") && issue.getAsJsonObject("closed_by").has("name"))
                 ? issue.getAsJsonObject("closed_by").get("name").getAsString()
-                : "N/A"; // If issue is not closed or closed_by is missing
+                : "N/A";
+
         String issueTitle = issue.get("title").getAsString();
+
+        // Extract "created_at" field
+        boolean createdOnOrAfterThreshold = false;
+        if (issue.has("created_at") && !issue.get("created_at").isJsonNull()) {
+            String createdAt = issue.get("created_at").getAsString();
+            // Check if the issue was created on or after October 1, 2024
+            createdOnOrAfterThreshold = createdAt.compareTo("2024-10-01T00:00:00Z") >= 0;
+        }
+
         // Predefined list of crew delivery epic IDs
         List<Integer> crewDeliveryEpicIds = List.of(2345, 5678, 7890);
 
@@ -176,17 +186,19 @@ public class IssueValidator {
             }
         }
 
-        // Log failures based on conditions
-        if (isOpen && !hasWeight) {
-            logIssueFailure(issueId, issueLink, "Open issue missing weight",createdBy,closedBy,issueTitle);
-        } else if (closedAfterThreshold && !hasWeight) {
-            logIssueFailure(issueId, issueLink, "Closed issue (on/after 2025-01-01) missing weight",createdBy,closedBy,issueTitle);
+        // Updated open issue weight check: Only validate if created on or after 2024-10-01
+        if (isOpen && createdOnOrAfterThreshold && !hasWeight) {
+            logIssueFailure(issueId, issueLink, "Open issue (created on/after 2024-10-01) missing weight", createdBy, closedBy, issueTitle);
+        }
+
+        if (closedAfterThreshold && !hasWeight) {
+            logIssueFailure(issueId, issueLink, "Closed issue (on/after 2025-01-01) missing weight", createdBy, closedBy, issueTitle);
         }
 
         if (!isLinkedToEpic) {
-            logIssueFailure(issueId, issueLink, "Issue not linked to an epic",createdBy,closedBy,issueTitle);
+            logIssueFailure(issueId, issueLink, "Issue not linked to an epic", createdBy, closedBy, issueTitle);
         } else if (!isLinkedToCrewDeliveryEpic) {
-            logIssueFailure(issueId, issueLink, "Issue not linked to a crew delivery epic (epic ID not in the allowed list)",createdBy,closedBy,issueTitle);
+            logIssueFailure(issueId, issueLink, "Issue not linked to a crew delivery epic (epic ID not in the allowed list)", createdBy, closedBy, issueTitle);
         }
     }
 

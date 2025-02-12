@@ -24,6 +24,7 @@ public class EpicValidator {
     public static final List<Map<String, String>> epicFailures = new ArrayList<>();
     public static final List<Map<String, String>> crewDeliveryEpics = new ArrayList<>();
     private static final LocalDate DATE_THRESHOLD = LocalDate.parse("2025-01-01");
+    private static final LocalDate EPIC_CREATION_THRESHOLD = LocalDate.parse("2024-10-01");
 
     public void validateEpicsUnderGroup(int groupId, Gson gson) {
         int currentPage = 1;
@@ -86,18 +87,22 @@ public class EpicValidator {
                 epicClosedBy = epic.get("closed_by").getAsJsonObject().get("name").getAsString();
             }
 
+            String createdAt = epic.has("created_at") && !epic.get("created_at").isJsonNull()
+                    ? epic.get("created_at").getAsString()
+                    : null;
+
             // Perform start and due date check
             boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
             boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
 
-            if (state.equalsIgnoreCase("opened")) {
+            if (state.equalsIgnoreCase("opened") && isCreatedOnOrAfterThreshold(createdAt)) {
                 if (!hasStartDate || !hasDueDate) {
-                    logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date", epicCreatedBy,epicClosedBy,epicTitle);
+                    logEpicFailure(epicId, epicLink, "Open Epic Missing start and/or due date", epicCreatedBy, epicClosedBy, epicTitle);
                 }
             }
 
-            // Perform Crew Delivery Epic check based on state
-            if ("opened".equalsIgnoreCase(state)) {
+            // Perform Crew Delivery Epic check based on state and threshold create_at
+            if ("opened".equalsIgnoreCase(state) && isCreatedOnOrAfterThreshold(createdAt)) {
                 validateCrewDeliveryEpic(epic, epicId, epicLink, allEpics);
             } else if ("closed".equalsIgnoreCase(state) && isClosedOnOrAfterThreshold(closedAt)) {
                 validateCrewDeliveryEpic(epic, epicId, epicLink, allEpics);
@@ -113,10 +118,18 @@ public class EpicValidator {
         return closedDate.isAfter(DATE_THRESHOLD.minusDays(1)); // After or on 2025-01-01
     }
 
+    private boolean isCreatedOnOrAfterThreshold(String createdAt) {
+        if (createdAt == null) {
+            return false;
+        }
+        LocalDate createdDate = LocalDate.parse(createdAt, DateTimeFormatter.ISO_DATE_TIME);
+        return createdDate.isAfter(EPIC_CREATION_THRESHOLD.minusDays(1));
+    }
+
     private void validateCrewDeliveryEpic(JsonObject epic, int epicId, String epicLink, Map<Integer, JsonObject> allEpics) {
         // Check if the epic has the label "Crew Delivery Epic"
         boolean isCrewDeliveryEpic = epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Crew Delivery Epic");
-        if (isCrewDeliveryEpic) {
+        if (isCrewDeliveryEpic || isPartOfCrewDeliveryEpic(epic,allEpics)) {
             logCrewDeliveryEpic(epicId, epicLink);
         } else {
             String state = epic.get("state").getAsString(); // Open or Closed
