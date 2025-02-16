@@ -40,6 +40,12 @@
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.3</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.hierynomus</groupId>
+            <artifactId>sshj</artifactId>
+            <version>0.36.0</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -64,7 +70,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>com.aisa.gitlab.poc.GitLabGroupValidation1</mainClass>
+                            <mainClass>com.aisa.gitlab.pocs.gl.GitLabGroupValidation</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

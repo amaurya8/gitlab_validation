@@ -1,4 +1,4 @@
-package com.aisa.gitlab.poc;
+package com.aisa.gitlab.pocs.gl;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -27,11 +27,19 @@ public class GitLabGroupValidation {
 
     private static final List<Map<String, String>> epicFailures = new ArrayList<>();
     private static final List<Map<String, String>> issueFailures = new ArrayList<>();
+    private static final List<Map<String, String>> crewDeliveryEpics = new ArrayList<>();
 
     public static void main(String[] args) throws IOException {
         LOGGER.info("Starting GitLab Group Validation...");
-        int groupId = 12345; // Replace with your GitLab group ID
-        validateGroupEpicsAndIssues(groupId);
+
+        // Set of group IDs to validate
+        Set<Integer> groupIds = new HashSet<>(Arrays.asList(12345, 67890)); // Replace with actual group IDs
+
+        // Perform validation for all groups
+        for (int groupId : groupIds) {
+            LOGGER.log(Level.INFO, "Validating group with ID: {0}", groupId);
+            validateGroupEpicsAndIssues(groupId);
+        }
 
         // Generate the Excel report
         generateExcelReport();
@@ -83,7 +91,7 @@ public class GitLabGroupValidation {
                 String createdAt = epic.get("created_at").getAsString();
 
                 if (isCreatedWithinLastYear(createdAt)) {
-                    validateEpic(epic, epicId, epicLink);
+                    validateEpic(epic, epicId, epicLink, createdAt);
                 }
             }
 
@@ -93,7 +101,7 @@ public class GitLabGroupValidation {
         }
     }
 
-    private static void validateEpic(JsonObject epic, int epicId, String epicLink) {
+    private static void validateEpic(JsonObject epic, int epicId, String epicLink, String createdAt) {
         boolean hasStartDate = epic.has("start_date") && !epic.get("start_date").isJsonNull();
         boolean hasDueDate = epic.has("due_date") && !epic.get("due_date").isJsonNull();
 
@@ -101,11 +109,31 @@ public class GitLabGroupValidation {
             logEpicFailure(epicId, epicLink, "Missing start and/or due date");
         }
 
-        // Crew Delivery Epic Check
-        boolean isCrewDeliveryEpic = epic.has("title") && epic.get("title").getAsString().toLowerCase().contains("crew delivery");
-        if (!isCrewDeliveryEpic) {
-            logEpicFailure(epicId, epicLink, "Not a Crew Delivery epic");
+        // Check if the epic has the label "Crew Delivery Epic"
+        boolean isCrewDeliveryEpic = epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Crew Delivery Epic");
+        if (isCrewDeliveryEpic) {
+            logCrewDeliveryEpic(epicId, epicLink, createdAt);
+        } else {
+            logEpicFailure(epicId, epicLink, "Not labeled as Crew Delivery Epic");
         }
+    }
+
+    private static boolean containsLabel(JsonArray labels, String targetLabel) {
+        for (JsonElement label : labels) {
+            if (label.getAsString().equalsIgnoreCase(targetLabel)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void logCrewDeliveryEpic(int epicId, String epicLink, String createdAt) {
+        Map<String, String> crewEpic = new HashMap<>();
+        crewEpic.put("epic_id", String.valueOf(epicId));
+        crewEpic.put("epic_link", epicLink);
+        crewEpic.put("created_at", createdAt);
+        crewDeliveryEpics.add(crewEpic);
+        LOGGER.log(Level.INFO, "Crew Delivery Epic found: {0}", epicLink);
     }
 
     private static void validateIssuesInProjectsUnderGroup(int groupId, Gson gson) {
@@ -196,6 +224,12 @@ public class GitLabGroupValidation {
         }
     }
 
+    private static boolean isCreatedWithinLastYear(String createdAt) {
+        LocalDate createdDate = LocalDate.parse(createdAt, DATE_FORMATTER);
+        LocalDate oneYearAgo = LocalDate.now().minusYears(1);
+        return createdDate.isAfter(oneYearAgo);
+    }
+
     private static void logEpicFailure(int epicId, String epicLink, String message) {
         Map<String, String> failure = new HashMap<>();
         failure.put("epic_id", String.valueOf(epicId));
@@ -214,17 +248,12 @@ public class GitLabGroupValidation {
         LOGGER.log(Level.WARNING, "Issue validation failure: {0} - {1}", new Object[]{issueLink, message});
     }
 
-    private static boolean isCreatedWithinLastYear(String createdAt) {
-        LocalDate createdDate = LocalDate.parse(createdAt, DATE_FORMATTER);
-        LocalDate oneYearAgo = LocalDate.now().minusYears(1);
-        return createdDate.isAfter(oneYearAgo);
-    }
-
     private static void generateExcelReport() throws IOException {
         LOGGER.info("Generating Excel report...");
         Workbook workbook = new XSSFWorkbook();
         Sheet epicSheet = workbook.createSheet("Epic Failures");
         Sheet issueSheet = workbook.createSheet("Issue Failures");
+        Sheet crewEpicSheet = workbook.createSheet("Crew Delivery Epics");
 
         // Create headers for the epic sheet
         Row epicHeader = epicSheet.createRow(0);
@@ -256,6 +285,21 @@ public class GitLabGroupValidation {
             row.createCell(2).setCellValue(failure.get("failure_message"));
         }
 
+        // Create headers for the Crew Delivery Epics sheet
+        Row crewEpicHeader = crewEpicSheet.createRow(0);
+        crewEpicHeader.createCell(0).setCellValue("Epic ID");
+        crewEpicHeader.createCell(1).setCellValue("Epic Link");
+        crewEpicHeader.createCell(2).setCellValue("Created At");
+
+        // Populate Crew Delivery epics
+        int crewEpicRowNum = 1;
+        for (Map<String, String> crewEpic : crewDeliveryEpics) {
+            Row row = crewEpicSheet.createRow(crewEpicRowNum++);
+            row.createCell(0).setCellValue(crewEpic.get("epic_id"));
+            row.createCell(1).setCellValue(crewEpic.get("epic_link"));
+            row.createCell(2).setCellValue(crewEpic.get("created_at"));
+        }
+
         try (FileOutputStream fos = new FileOutputStream("GitLab_Validation_Report.xlsx")) {
             workbook.write(fos);
         }
@@ -264,3 +308,4 @@ public class GitLabGroupValidation {
         LOGGER.info("Excel report generated successfully.");
     }
 }
+
