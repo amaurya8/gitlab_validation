@@ -17,35 +17,26 @@ fi
 touch "$LOCKFILE"
 trap "rm -f $LOCKFILE; log_message 'Script terminated. Lockfile removed.'" EXIT  # Ensure lock removal
 
-while true; do
-    current_time=$(date +"%H:%M")
-    current_day=$(date +"%u")  # Get the day of the week (1=Monday, 7=Sunday)
+# Get current day and time
+current_day=$(date +"%u")  # 4 = Thursday
+current_time=$(date +"%H:%M")  # 16:00 = 4 PM
 
-    # Skip execution on weekends (Saturday=6, Sunday=7)
-    if [[ "$current_day" -ge 6 ]]; then
-        log_message "Skipping execution on weekends. Sleeping for 24 hours."
-        sleep 86400  # Sleep for 24 hours and check again the next day
-        continue
-    fi
+# Check if it's Thursday 4 PM IST = 10:30 UTC
+if [[ "$current_day" -eq 4 && "$current_time" == "10:30" ]]; then
+    log_message "Running Java program at $current_time on Thursday."
 
-    if [ "$current_time" == "08:00" ]; then
-        log_message "Running Java program at $current_time on a weekday."
+    # Execute Java program and capture the exit status
+    /usr/bin/java -jar /path/to/your-program.jar >> "$LOGFILE" 2>&1
+    java_exit_status=$?
 
-        # Execute Java program and capture the exit status
-        /usr/bin/java -jar /path/to/your-program.jar >> "$LOGFILE" 2>&1
-        java_exit_status=$?
-
-        if [ $java_exit_status -eq 0 ]; then
-            log_message "Java program executed successfully."
-        else
-            log_message "Java program failed with exit code $java_exit_status."
-        fi
-
-        sleep 86400  # Sleep for 24 hours
+    if [ $java_exit_status -eq 0 ]; then
+        log_message "Java program executed successfully."
     else
-        sleep 60  # Check every minute
+        log_message "Java program failed with exit code $java_exit_status."
     fi
-done
+else
+    log_message "Not the scheduled time. Exiting."
+fi
 
 #Running in backgroud, checking status and killing on need basis
 #nohup ./script.sh &
