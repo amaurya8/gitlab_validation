@@ -1,0 +1,11 @@
+package com.aisa.gitlab.main;
+
+public class Temp {
+
+    private static final String PRIVATE_TOKEN = System.getProperty("gitlab.private.token", System.getenv("GITLAB_PRIVATE_TOKEN"));
+    java -Dgitlab.private.token=your_personal_access_token -jar your-app.jar
+
+    if (PRIVATE_TOKEN == null || PRIVATE_TOKEN.isEmpty()) {
+        throw new IllegalStateException("GitLab Private Token is missing! Please set it using -Dgitlab.private.token or environment variable.");
+    }
+}

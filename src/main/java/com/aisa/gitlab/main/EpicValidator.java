@@ -8,12 +8,10 @@ import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,6 +23,7 @@ public class EpicValidator {
     public static final List<Map<String, String>> crewDeliveryEpics = new ArrayList<>();
     private static final LocalDate DATE_THRESHOLD = LocalDate.parse("2025-01-01");
     private static final LocalDate EPIC_CREATION_THRESHOLD = LocalDate.parse("2024-10-01");
+    private static final Set<Integer> EXCLUDED_EPIC_IDS = loadExcludedEpicIds();
 
     public void validateEpicsUnderGroup(int groupId, Gson gson) {
         int currentPage = 1;
@@ -74,6 +73,10 @@ public class EpicValidator {
         for (Map.Entry<Integer, JsonObject> entry : allEpics.entrySet()) {
             JsonObject epic = entry.getValue();
             int epicId = epic.get("id").getAsInt();
+            if (EXCLUDED_EPIC_IDS.contains(epicId)) {
+                LOGGER.log(Level.INFO, "Skipping validation for excluded epic ID: {0}", epicId);
+                continue; // Skip this epic
+            }
             String epicLink = epic.get("web_url").getAsString();
             String state = epic.get("state").getAsString(); // Open or Closed
             String epicTitle = epic.get("title").getAsString();
@@ -209,5 +212,32 @@ public class EpicValidator {
             }
         }
         return "Unknown"; // Default if no match
+    }
+
+    private static Set<Integer> loadExcludedEpicIds() {
+        Set<Integer> excludedIds = new HashSet<>();
+        Properties properties = new Properties();
+
+        try (InputStream input = EpicValidator.class.getClassLoader().getResourceAsStream("application.properties")) {
+            if (input == null) {
+                LOGGER.log(Level.WARNING, "application.properties file not found!");
+                return excludedIds;
+            }
+
+            // Load the properties file
+            properties.load(input);
+
+            // Read the excluded.epic.ids property
+            String excludedIdsStr = properties.getProperty("excluded.epic.ids");
+            if (excludedIdsStr != null && !excludedIdsStr.isEmpty()) {
+                for (String id : excludedIdsStr.split(",")) {
+                    excludedIds.add(Integer.parseInt(id.trim()));
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to load application.properties: " + e.getMessage(), e);
+        }
+
+        return excludedIds;
     }
 }
