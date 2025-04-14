@@ -77,6 +77,16 @@ public class EpicValidator {
                 LOGGER.log(Level.INFO, "Skipping validation for excluded epic ID: {0}", epicId);
                 continue; // Skip this epic
             }
+
+            if (epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Cancelled")) {
+                LOGGER.log(Level.INFO, "Skipping Cancelled epic ID: {0}", epicId);
+                continue;
+            }
+            if (epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Do Not Use")) {
+                LOGGER.log(Level.INFO, "Skipping Do Not Use epic ID: {0}", epicId);
+                continue;
+            }
+
             String epicLink = epic.get("web_url").getAsString();
             String state = epic.get("state").getAsString(); // Open or Closed
             String epicTitle = epic.get("title").getAsString();

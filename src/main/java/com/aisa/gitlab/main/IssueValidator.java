@@ -141,6 +141,11 @@ public class IssueValidator {
     }
 
     private void validateIssue(JsonObject issue, int issueId, String issueLink) {
+
+        // Skip issues that are not relevant for validation
+        if (shouldSkipIssue(issue, issueId)) {
+            return;
+        }
         boolean hasWeight = issue.has("weight") && !issue.get("weight").isJsonNull();
         boolean isOpen = issue.has("state") && "opened".equalsIgnoreCase(issue.get("state").getAsString());
         boolean isClosed = issue.has("state") && "closed".equalsIgnoreCase(issue.get("state").getAsString());
@@ -214,5 +219,29 @@ public class IssueValidator {
         issueFailures.add(failure);
         LOGGER.log(Level.WARNING, "Issue validation failure: {0} - {1} | Created by: {2} | Closed by: {3}",
                 new Object[]{issueLink, message, createdBy, closedBy});
+    }
+
+    private boolean shouldSkipIssue(JsonObject issue, int issueId) {
+        // Skip if issue has label "Cancelled"
+        if (issue.has("labels") && issue.get("labels").isJsonArray()) {
+            JsonArray labels = issue.getAsJsonArray("labels");
+            for (JsonElement label : labels) {
+                if (label.getAsString().equalsIgnoreCase("Cancelled")) {
+                    LOGGER.log(Level.INFO, "Skipping issue {0} as it is labelled 'Cancelled'", issueId);
+                    return true;
+                }
+            }
+        }
+
+        // Skip if it's a work item or task
+        if (issue.has("type") && issue.get("type").isJsonPrimitive()) {
+            String type = issue.get("type").getAsString();
+            if (type.equalsIgnoreCase("WORK_ITEM") || type.equalsIgnoreCase("TASK")) {
+                LOGGER.log(Level.INFO, "Skipping issue {0} as it is a work item (type: {1})", new Object[]{issueId, type});
+                return true;
+            }
+        }
+
+        return false; // Don't skip
     }
 }
