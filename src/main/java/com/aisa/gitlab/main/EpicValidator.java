@@ -120,6 +120,22 @@ public class EpicValidator {
             } else if ("closed".equalsIgnoreCase(state) && isClosedOnOrAfterThreshold(closedAt)) {
                 validateCrewDeliveryEpic(epic, epicId, epicLink, allEpics);
             }
+
+            if (state.equalsIgnoreCase("closed") && isClosedOnOrAfterThreshold(closedAt) && epic.has("labels") && epic.get("labels").isJsonArray()) {
+                JsonArray labels = epic.getAsJsonArray("labels");
+                boolean hasStatusDone = false;
+
+                for (JsonElement label : labels) {
+                    if (label.getAsString().equalsIgnoreCase("Status::Done")) {
+                        hasStatusDone = true;
+                        break;
+                    }
+                }
+
+                if (!hasStatusDone) {
+                    logEpicFailure(epicId, epicLink, "Closed epic missing label 'Status::Done'", epicCreatedBy, epicClosedBy, epicTitle);
+                }
+            }
         }
     }
 

@@ -205,6 +205,23 @@ public class IssueValidator {
         } else if (!isLinkedToCrewDeliveryEpic) {
             logIssueFailure(issueId, issueLink, "Issue not linked to a crew delivery epic (epic ID not in the allowed list)", createdBy, closedBy, issueTitle);
         }
+
+        if (isClosed && issue.has("labels") && issue.get("labels").isJsonArray()) {
+            JsonArray labels = issue.getAsJsonArray("labels");
+            boolean hasStatusDone = false;
+
+            for (JsonElement labelElement : labels) {
+                String label = labelElement.getAsString();
+                if (label.equalsIgnoreCase("Status::Done")) {
+                    hasStatusDone = true;
+                    break;
+                }
+            }
+
+            if (!hasStatusDone) {
+                logIssueFailure(issueId, issueLink, "Closed issue missing label 'Status::Done'", createdBy, closedBy, issueTitle);
+            }
+        }
     }
 
     private void logIssueFailure(int issueId, String issueLink, String message, String createdBy, String closedBy,String issueTitle) {
