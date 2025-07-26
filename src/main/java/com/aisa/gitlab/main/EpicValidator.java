@@ -202,6 +202,45 @@ public class EpicValidator {
         return false; // No "Crew Delivery Epic" label found in the hierarchy
     }
 
+    // when parent epic is not in the same group
+    private boolean isPartOfCrewDeliveryEpicEnhanced(JsonObject epic, Map<Integer, JsonObject> allEpics) {
+        Gson gson = new Gson();
+        while (epic != null) {
+            // 🔍 Check if current epic has the target label
+            if (epic.has("labels") && containsLabel(epic.getAsJsonArray("labels"), "Crew Delivery Epic")) {
+                return true;
+            }
+
+            // 🔁 Traverse to parent
+            if (epic.has("parent_id") && !epic.get("parent_id").isJsonNull()) {
+                int parentId = epic.get("parent_id").getAsInt();
+
+                // Try from local cache first
+                if (allEpics.containsKey(parentId)) {
+                    epic = allEpics.get(parentId);
+                } else {
+                    // 🛠️ Dynamically fetch parent epic via global endpoint
+                    Response response = RestAssured.given()
+                            .header("PRIVATE-TOKEN", PRIVATE_TOKEN)
+                            .get("/epics/" + parentId);
+
+                    if (response.statusCode() == 200) {
+                        JsonObject parentEpic = gson.fromJson(response.getBody().asString(), JsonObject.class);
+                        allEpics.put(parentId, parentEpic); // cache for reuse
+                        epic = parentEpic;
+                    } else {
+                        LOGGER.warning("Failed to fetch parent epic with ID: " + parentId);
+                        return false; // stop traversal if inaccessible
+                    }
+                }
+            } else {
+                break; // no parent, stop
+            }
+        }
+
+        return false; // no label found in ancestry
+    }
+
     private void logCrewDeliveryEpic(int epicId, String epicLink) {
         Map<String, String> crewEpic = new HashMap<>();
         crewEpic.put("epic_id", String.valueOf(epicId));
